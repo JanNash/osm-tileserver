@@ -1,0 +1,66 @@
+#!/bin/bash
+
+set -e
+
+SCRIPT_PATH="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+cd "$SCRIPT_PATH"
+
+mkdir -p "$IMAGE_DIRECTORY_PATH"
+cd "$IMAGE_DIRECTORY_PATH"
+
+if [[ ! -d "$POSTGRES_OSM_DIR_NAME" ]];
+then
+	git clone git@github.com:JanNash/docker-postgres-osm "$POSTGRES_OSM_DIR_NAME"
+fi
+cd $POSTGRES_OSM_DIR_NAME
+git checkout "$POSTGRES_OSM_VERSION"
+cd ..
+
+
+if [[ ! -d "$POSTGRES_MONITOR_DIR_NAME" ]];
+then
+	git clone git@github.com:JanNash/docker-postgres-monitor "$POSTGRES_MONITOR_DIR_NAME"
+fi
+cd "$POSTGRES_MONITOR_DIR_NAME"
+git checkout "$POSTGRES_MONITOR_VERSION"
+cd ..
+
+
+if [[ ! -d "$OSM2PGSQL_DIR_NAME" ]];
+then
+	git clone git@github.com:JanNash/docker-osm2pgsql "$OSM2PGSQL_DIR_NAME"
+fi
+cd "$OSM2PGSQL_DIR_NAME"
+git checkout "$OSM2PGSQL_VERSION"
+cd ..
+
+
+if [[ ! -d "$SHAPEFILES_DIR_NAME" ]];
+then
+	git clone git@github.com:JanNash/docker-shapefiles "$SHAPEFILES_DIR_NAME"
+fi
+cd "$SHAPEFILES_DIR_NAME"
+git checkout "$SHAPEFILES_VERSION"
+cd ..
+
+
+if [[ ! -d "$OSM_BRIGHT_DIR_NAME" ]];
+then
+	git clone git@github.com:JanNash/docker-osm-bright "$OSM_BRIGHT_DIR_NAME"
+fi
+cd "$OSM_BRIGHT_DIR_NAME"
+git checkout "$OSM_BRIGHT_VERSION"
+cd ..
+
+
+if [[ ! -d "$RENDERD_DIR_NAME" ]];
+then
+	git clone git@github.com:JanNash/docker-renderd-osm	"$RENDERD_DIR_NAME"
+fi
+cd "$RENDERD_DIR_NAME"
+git checkout "$RENDERD_VERSION"
+cd ..
+
+cd "$SCRIPT_PATH"
+
+docker-compose build

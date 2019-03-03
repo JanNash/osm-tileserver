@@ -1,0 +1,10 @@
+#!/bin/bash
+
+set -e
+
+cd "$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+
+docker-compose stop
+docker-compose rm
+docker system prune
+rm -rf "$IMAGE_DIRECTORY_PATH/docker-images"

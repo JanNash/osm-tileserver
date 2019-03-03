@@ -9,4 +9,4 @@ postgres-osm/pg_config_volume/*
 
 osm2pgsql/pbf_import_volume/*
 !osm2pgsql/pbf_import_volume/.gitkeep
-!osm2pgsql/pbf_import_volume/Karpathos.osm.pbf
+!osm2pgsql/pbf_import_volume/Berlin.osm.pbf
