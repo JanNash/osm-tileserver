@@ -1,0 +1,12 @@
+docker-images/
+
+postgres-osm/pg_config_volume/*
+!postgres-osm/pg_config_volume/.gitkeep
+!postgres-osm/pg_config_volume/postgresql.auto.conf
+!postgres-osm/pg_config_volume/postgresql.conf
+!postgres-osm/pg_config_volume/postmaster.opts
+
+
+osm2pgsql/pbf_import_volume/*
+!osm2pgsql/pbf_import_volume/.gitkeep
+!osm2pgsql/pbf_import_volume/Karpathos.osm.pbf
