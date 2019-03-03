@@ -1,0 +1,183 @@
+# VERSION 0.6.0
+
+version: '3'
+
+
+volumes:
+  postgres_status_volume:
+  osm2pgsql_status_volume:
+  shapefiles_status_volume:
+  osmbright_status_volume:
+  flatnodes_volume:
+  styles_volume:
+  shapefiles_volume:
+
+
+services:
+  common-env:
+    image: jannash/noop:0.1.0
+    container_name: osm-tileserver_common-env
+    
+    # Volumes
+    environment:
+      - &postgres_status_volume    postgres_status_volume:/postgres_status
+      - &osm2pgsql_status_volume   osm2pgsql_status_volume:/osm2pgsql_status
+      - &shapefiles_status_volume  shapefiles_status_volume:/shapefiles_status
+      - &osmbright_status_volume   osmbright_status_volume:/osmbright_status
+      - &flatnodes_volume          flatnodes_volume:/usr/share/osm-tileserver/volumes/flatnodes_volume
+      - &shapefiles_volume         shapefiles_volume:/usr/share/osm-tileserver/volumes/shapefiles_volume
+      - &styles_volume             styles_volume:/usr/share/osm-tileserver/volumes/styles_volume
+    
+    # Volume path environment variables
+    environment: &postgres_status_volume_path
+      STATUS_VOLUME_PATH:     /postgres_status
+    environment: &osm2pgsql_status_volume_path
+      STATUS_VOLUME_PATH:     /osm2pgsql_status
+    environment: &shapefiles_status_volume_path
+      STATUS_VOLUME_PATH:     /shapefiles_status
+    environment: &osmbright_status_volume_path
+      STATUS_VOLUME_PATH:     /osmbright_status
+    environment: &flatnodes_volume_path
+      FLATNODES_VOLUME_PATH:  /usr/share/osm-tileserver/volumes/flatnodes_volume
+    environment: &shapefiles_volume_path
+      SHAPEFILES_VOLUME_PATH: /usr/share/osm-tileserver/volumes/shapefiles_volume
+    environment: &styles_volume_path
+      STYLES_VOLUME_PATH:     /usr/share/osm-tileserver/volumes/styles_volume    
+
+    # Other paths
+    environment: &content_dir_path
+      CONTENT_DIR_PATH: /usr/share/osm-tileserver/content
+    
+    # postgres
+    environment: &postgres_version
+      POSTGRES_VERSION: 9.6
+    environment: &pgosm_container_alias
+      POSTGRES_CONTAINER_ALIAS: pg
+    environment: &pgosm_container_environment
+      POSTGRES_USER: osm
+      POSTGRES_DB: gis
+      POSTGRES_TCP_PORT: 5432
+
+
+  postgres-osm:
+    build: ${IMAGE_DIRECTORY_PATH}/${POSTGRES_OSM_DIR_NAME}
+    image: osm-tileserver/postgres-osm:${POSTGRES_OSM_VERSION}
+    container_name: osm-tileserver_postgres-osm
+    environment:
+      <<: *pgosm_container_environment
+
+  postgres-monitor:
+    build:
+      context: ${IMAGE_DIRECTORY_PATH}/${POSTGRES_MONITOR_DIR_NAME}
+      args:
+        <<: *postgres_status_volume_path
+        <<: *postgres_version
+    image: osm-tileserver/postgres-monitor:${POSTGRES_MONITOR_VERSION}
+    container_name: osm-tileserver_postgres-monitor
+    depends_on:
+      - postgres-osm
+    links:
+      - postgres-osm:pg
+    volumes:
+      - *postgres_status_volume
+    environment:
+      <<: *postgres_status_volume_path
+      <<: *pgosm_container_alias
+      <<: *pgosm_container_environment
+      POSTGRES_UP_POLL_INTERVAL: 60
+      POSTGRES_DOWN_POLL_INTERVAL: 1
+
+  osm2pgsql:
+    build:
+      context: ${IMAGE_DIRECTORY_PATH}/${OSM2PGSQL_DIR_NAME}
+      args:
+        <<: *osm2pgsql_status_volume_path
+    image: osm-tileserver/osm2pgsql:${OSM2PGSQL_VERSION}
+    container_name: osm-tileserver_osm2pgsql
+    depends_on:
+      - postgres-osm
+      - postgres-monitor
+    links:
+      - postgres-osm:pg
+    volumes:
+      - *postgres_status_volume
+      - *osm2pgsql_status_volume
+      - *flatnodes_volume
+      - ./osm2pgsql/pbf_import_volume:/usr/share/osm-tileserver/volumes/pbf_import_volume
+    entrypoint: postgres_status/wait_for_postgres
+    command: osm2pgsql-init
+    environment:
+      <<: *osm2pgsql_status_volume_path
+      <<: *flatnodes_volume_path
+      <<: *pgosm_container_alias
+      <<: *pgosm_container_environment
+      PBF_IMPORT_VOL: /usr/share/osm-tileserver/volumes/pbf_import_volume
+  
+  shapefiles:
+    build:
+      context: ${IMAGE_DIRECTORY_PATH}/${SHAPEFILES_DIR_NAME}
+      args:
+        <<: *shapefiles_status_volume_path
+    image: osm-tileserver/shapefiles:${SHAPEFILES_VERSION}
+    container_name: osm-tileserver_shapefiles
+    volumes:
+      - *shapefiles_status_volume
+      - *shapefiles_volume
+    environment:
+      <<: *shapefiles_status_volume_path
+      <<: *shapefiles_volume_path
+  
+  osm-bright:
+    build:
+      context: ${IMAGE_DIRECTORY_PATH}/${OSM_BRIGHT_DIR_NAME}
+      args:
+        <<: *osmbright_status_volume_path
+        <<: *content_dir_path
+    image: osm-tileserver/osm-bright:${OSM_BRIGHT_VERSION}
+    container_name: osm-tileserver_osm-bright
+    depends_on:
+      - postgres-osm
+      - postgres-monitor
+      - shapefiles
+    links:
+      - postgres-osm:pg
+    volumes:
+      - *osm2pgsql_status_volume
+      - *shapefiles_status_volume
+      - *osmbright_status_volume
+      - *shapefiles_volume
+      - *styles_volume
+    entrypoint: osm2pgsql_status/wait_for_osm2pgsql shapefiles_status/wait_for_shapefiles
+    command: load_and_process_osmbright
+    environment:
+      <<: *osmbright_status_volume_path
+      <<: *shapefiles_volume_path
+      <<: *styles_volume_path
+      <<: *pgosm_container_alias
+      <<: *pgosm_container_environment
+      <<: *content_dir_path
+
+  renderd:
+    build: ${IMAGE_DIRECTORY_PATH}/${RENDERD_DIR_NAME}
+    image: osm-tileserver/renderd:${RENDERD_VERSION}
+    container_name: osm-tileserver_renderd
+    depends_on:
+      - postgres-osm
+      - postgres-monitor
+      - osm2pgsql
+      - shapefiles
+      - osm-bright
+    links:
+      - postgres-osm:pg
+    volumes:
+      - *osm2pgsql_status_volume
+      - *osmbright_status_volume
+      - *shapefiles_volume
+      - *styles_volume
+    entrypoint: osmbright_status/wait_for_osmbright osm2pgsql_status/wait_for_osm2pgsql
+    command: /usr/sbin/runit_bootstrap
+    ports:
+      - "80:80"
+    environment:
+      <<: *pgosm_container_alias
+      <<: *pgosm_container_environment
